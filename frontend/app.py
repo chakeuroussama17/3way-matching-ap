@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 
-API = "http://localhost:8000"
+API = "https://threeway-matching-ap.onrender.com"
 
 st.set_page_config(
     page_title="3-Way Matching AP Automation",
