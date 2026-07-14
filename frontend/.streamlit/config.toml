@@ -1,0 +1,12 @@
+# MindHive theme — restrained slate-navy with a single muted-gold accent.
+[theme]
+base                    = "dark"
+primaryColor            = "#D8A83E"   # muted gold — primary action / progress only
+backgroundColor         = "#0E1B2C"   # slate-navy app background
+secondaryBackgroundColor= "#152436"   # cards, sidebar, inputs
+textColor               = "#DCE5F0"   # soft ink
+font                    = "sans serif"
+
+[server]
+# Streamlit defaults to 8501; change here if that port is taken.
+headless = true

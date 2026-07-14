@@ -2,4 +2,11 @@ venv/
 .env
 __pycache__/
 *.pyc
-outputs/
+*.db
+credentials.json
+
+# ML generated artifacts, logs and metadata (regenerate with model_trainer)
+backend/ml/artifacts/
+backend/ml/logs/
+# Generated demo data (recreate with: python -m ml.data_generator)
+backend/data/sample_training_data.csv
