@@ -4,10 +4,24 @@ import pandas as pd
 import requests
 import streamlit as st
 
-# API base is configurable so the frontend isn't locked to one host.
-# Defaults to the deployed Render backend; override for local dev with e.g.
-#   AP_API_URL=http://localhost:8000  (PowerShell: $env:AP_API_URL="...")
-API = os.getenv("AP_API_URL", "https://threeway-matching-ap.onrender.com")
+# API base resolution (first match wins):
+#   1. AP_API_URL env var        — local dev override, e.g. http://localhost:8080
+#   2. st.secrets["AP_API_URL"]  — set this on Streamlit Cloud to your Render URL
+#   3. http://localhost:8000     — sensible local default
+# This keeps local development working out of the box while letting the deployed
+# app point at the deployed backend via a secret (no code change needed).
+def _resolve_api() -> str:
+    if os.getenv("AP_API_URL"):
+        return os.getenv("AP_API_URL").rstrip("/")
+    try:
+        if "AP_API_URL" in st.secrets:
+            return str(st.secrets["AP_API_URL"]).rstrip("/")
+    except Exception:  # no secrets.toml present — fine, fall through
+        pass
+    return "http://localhost:8000"
+
+
+API = _resolve_api()
 
 st.set_page_config(
     page_title="MindHive · AP Intelligence",
@@ -15,66 +29,83 @@ st.set_page_config(
     layout="wide",
 )
 
-# ── MindHive theme — restrained slate-navy with a single desaturated gold accent
+# ── MindHive theme — "Nova" style: dark, glassy, violet→cyan gradient accent ──
 THEME_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 :root{
-  --bg-0:#0E1B2C; --bg-1:#0B1624; --card:#152436; --card-2:#182B41;
-  --border:#243851; --border-soft:#1E2E43;
-  --ink:#DCE5F0; --muted:#8FA1B8; --muted-2:#61748C;
-  --accent:#D8A83E; --accent-l:#E7C170;   /* muted gold, used sparingly */
+  --bg-0:#0A0A14; --bg-1:#08080F;
+  --surface:rgba(255,255,255,.035); --surface-2:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.09); --border-strong:rgba(255,255,255,.16);
+  --ink:#ECECF6; --muted:#9B9BB6; --muted-2:#6E6E88;
+  --violet:#7C5CFF; --indigo:#6366F1; --cyan:#22D3EE; --good:#34D399;
+  --grad:linear-gradient(90deg,#8B7CFF 0%,#7C5CFF 42%,#22D3EE 100%);
 }
 html, body, .stApp, [data-testid="stAppViewContainer"]{ font-family:'Inter','Segoe UI',sans-serif; }
-.stApp{ background:linear-gradient(180deg,var(--bg-0) 0%,var(--bg-1) 100%); background-attachment:fixed; }
-.block-container{ padding-top:1.3rem; max-width:1220px; }
+.stApp{
+  background:
+    radial-gradient(720px 460px at 10% -5%, rgba(124,92,255,.22), transparent 60%),
+    radial-gradient(620px 520px at 100% 0%, rgba(34,211,238,.07), transparent 55%),
+    linear-gradient(180deg,var(--bg-0) 0%,var(--bg-1) 100%);
+  background-attachment:fixed;
+}
+.block-container{ padding-top:1.4rem; max-width:1220px; }
 
-/* ── Hero (flat, quiet) ── */
-.mh-hero{ position:relative; border-radius:12px; padding:22px 26px; margin:2px 0 20px 0;
-  border:1px solid var(--border); border-left:3px solid var(--accent);
-  background:var(--card); }
-.mh-hero-inner{ display:flex; align-items:center; gap:16px; }
-.mh-logo{ font-size:34px; line-height:1; color:var(--accent); }
-.mh-title{ font-size:25px; font-weight:700; letter-spacing:.2px; color:var(--ink); }
-.mh-title span{ color:var(--accent); }
-.mh-sub{ margin-top:3px; font-size:13px; color:var(--muted); }
-.mh-pills{ margin-top:11px; display:flex; gap:7px; flex-wrap:wrap; }
+/* ── Hero ── */
+.mh-hero{ position:relative; overflow:hidden; border-radius:18px; padding:28px 32px; margin:2px 0 22px 0;
+  border:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(124,92,255,.10),rgba(255,255,255,.02));
+  box-shadow:0 20px 60px rgba(0,0,0,.40); }
+.mh-hero::before{ content:""; position:absolute; left:-90px; top:-130px; width:380px; height:380px;
+  background:radial-gradient(circle,rgba(124,92,255,.35),transparent 62%); pointer-events:none; }
+.mh-hero-inner{ position:relative; display:flex; align-items:flex-start; gap:18px; }
+.mh-logo{ width:52px; height:52px; flex:0 0 auto; display:grid; place-items:center; border-radius:14px;
+  font-size:25px; color:#fff; background:linear-gradient(135deg,#7C5CFF,#6366F1);
+  box-shadow:0 8px 24px rgba(124,92,255,.5); }
+.mh-status{ display:inline-flex; align-items:center; gap:7px; font-size:11.5px; font-weight:600;
+  color:var(--muted); border:1px solid var(--border); background:rgba(255,255,255,.04);
+  padding:4px 11px; border-radius:999px; margin-bottom:12px; }
+.mh-status .dot{ width:7px; height:7px; border-radius:50%; background:var(--good); box-shadow:0 0 8px var(--good); }
+.mh-title{ font-size:29px; font-weight:800; letter-spacing:-.5px; line-height:1.15; color:var(--ink); }
+.mh-title .grad{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.mh-sub{ margin-top:8px; font-size:13.5px; color:var(--muted); max-width:640px; line-height:1.55; }
+.mh-pills{ margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; }
 .mh-pill{ font-size:11px; font-weight:600; color:var(--muted); letter-spacing:.2px;
-  border:1px solid var(--border); background:transparent; padding:3px 10px; border-radius:6px; }
+  border:1px solid var(--border); background:rgba(255,255,255,.03); padding:4px 11px; border-radius:999px; }
 
 /* ── Headings ── */
-h1,h2,h3,h4{ color:var(--ink); font-weight:700; letter-spacing:.1px; }
+h1,h2,h3,h4{ color:var(--ink); font-weight:700; letter-spacing:-.2px; }
 
-/* ── Metric cards (neutral; value is ink, not accent) ── */
-[data-testid="stMetric"]{ background:var(--card); border:1px solid var(--border);
-  border-radius:10px; padding:13px 15px; }
-[data-testid="stMetricValue"]{ color:var(--ink); font-weight:700; }
+/* ── Metric cards (glass) ── */
+[data-testid="stMetric"]{ background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:14px 16px; }
+[data-testid="stMetricValue"]{ color:var(--ink); font-weight:800; }
 [data-testid="stMetricLabel"]{ color:var(--muted); font-weight:600; }
 
-/* ── Bordered containers → flat cards ── */
-[data-testid="stVerticalBlockBorderWrapper"]{ background:var(--card);
-  border:1px solid var(--border)!important; border-radius:10px; }
+/* ── Bordered containers → glass cards ── */
+[data-testid="stVerticalBlockBorderWrapper"]{ background:var(--surface);
+  border:1px solid var(--border)!important; border-radius:16px; }
 
-/* ── Buttons (accent reserved for primary only) ── */
-.stButton>button, .stDownloadButton>button{ border-radius:8px; font-weight:600;
-  border:1px solid var(--border); background:var(--card-2); color:var(--ink); transition:all .15s; }
-.stButton>button:hover, .stDownloadButton>button:hover{ border-color:var(--muted-2); background:#1D3149; }
-.stButton>button[kind="primary"]{ background:var(--accent); color:#20180A; border:1px solid var(--accent);
-  font-weight:700; }
-.stButton>button[kind="primary"]:hover{ background:var(--accent-l); border-color:var(--accent-l); }
+/* ── Buttons ── */
+.stButton>button, .stDownloadButton>button{ border-radius:10px; font-weight:600;
+  border:1px solid var(--border); background:var(--surface-2); color:var(--ink); transition:all .15s; }
+.stButton>button:hover, .stDownloadButton>button:hover{ border-color:var(--border-strong); background:rgba(255,255,255,.09); }
+.stButton>button[kind="primary"]{ background:linear-gradient(90deg,#7C5CFF,#6366F1); color:#fff; border:0; font-weight:600;
+  box-shadow:0 8px 22px rgba(124,92,255,.40); }
+.stButton>button[kind="primary"]:hover{ filter:brightness(1.08); box-shadow:0 10px 28px rgba(124,92,255,.5); }
 
-/* ── Tabs (underline accent only) ── */
-[data-baseweb="tab-list"]{ gap:4px; border-bottom:1px solid var(--border); }
+/* ── Tabs (gradient underline) ── */
+[data-baseweb="tab-list"]{ gap:6px; border-bottom:1px solid var(--border); }
 [data-baseweb="tab"]{ font-weight:600; color:var(--muted); background:transparent; padding:8px 14px; }
 [data-baseweb="tab"][aria-selected="true"]{ color:var(--ink); }
-[data-baseweb="tab-highlight"]{ background:var(--accent); }
+[data-baseweb="tab-highlight"]{ background:var(--violet); height:3px; border-radius:3px; }
 
 /* inputs / expander / progress / dataframe */
-.stNumberInput input, .stTextInput input, [data-baseweb="input"] input{ background:var(--bg-1)!important; }
-[data-testid="stExpander"]{ border:1px solid var(--border-soft); border-radius:8px; background:var(--card); }
-[data-testid="stProgress"] div[role="progressbar"]>div{ background:var(--accent)!important; }
-[data-testid="stDataFrame"]{ border:1px solid var(--border); border-radius:8px; }
-hr{ border-color:var(--border-soft); }
+.stNumberInput input, .stTextInput input, [data-baseweb="input"] input{ background:rgba(255,255,255,.04)!important; }
+[data-testid="stExpander"]{ border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+[data-testid="stProgress"] div[role="progressbar"]>div{ background:linear-gradient(90deg,#7C5CFF,#22D3EE)!important; }
+[data-testid="stDataFrame"]{ border:1px solid var(--border); border-radius:12px; }
+hr{ border-color:var(--border); }
 </style>
 """
 
@@ -90,8 +121,9 @@ def render_hero():
           <div class="mh-hero-inner">
             <div class="mh-logo">&#x2B22;</div>
             <div>
-              <div class="mh-title">Mind<span>Hive</span> &nbsp;·&nbsp; AP Intelligence</div>
-              <div class="mh-sub">Autonomous 3-way matching for Accounts Payable — extract, match, and route with ML.</div>
+              <div class="mh-status"><span class="dot"></span> Rule engine + 5 ML models · live</div>
+              <div class="mh-title">Mind<span class="grad">Hive</span> — AP that matches itself,<br>and flags what doesn't.</div>
+              <div class="mh-sub">Autonomous 3-way matching for Accounts Payable — extract PO, GRN &amp; Invoice with GPT-4o, detect anomalies, score vendor risk, and route approvals with explainable ML.</div>
               <div class="mh-pills">
                 <span class="mh-pill">3-Way Matching</span>
                 <span class="mh-pill">Anomaly Detection</span>

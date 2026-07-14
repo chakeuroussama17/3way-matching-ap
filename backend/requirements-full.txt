@@ -1,0 +1,11 @@
+# Full ML stack — a superset of requirements.txt for local development or hosts
+# with enough memory to build the heavier wheels. The application code detects
+# these at import time and uses them automatically when present.
+-r requirements.txt
+
+xgboost==3.2.0        # gradient-boosted workflow models (rejection/escalation/approval-time)
+shap==0.51.0          # TreeExplainer / LinearExplainer explainability
+
+# Optional: true semantic embeddings for smart matching. Installs torch (~2GB),
+# so it is left commented — rapidfuzz fuzzy matching is used until you enable it.
+# sentence-transformers==3.3.1

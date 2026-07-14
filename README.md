@@ -275,9 +275,17 @@ source venv/bin/activate     # Mac/Linux
 
 **3. Install dependencies**
 ```bash
-pip install -r backend/requirements.txt
+# Full ML stack (XGBoost + SHAP) — recommended for local development:
+pip install -r backend/requirements-full.txt
 pip install -r frontend/requirements.txt
 ```
+
+> `backend/requirements.txt` is a **slim** set (scikit-learn only) that installs on
+> constrained hosts like Render's free tier. The code auto-detects the heavier
+> libraries and falls back gracefully without them: **XGBoost → scikit-learn
+> HistGradientBoosting**, **SHAP → coefficient/importance/z-score explanations**,
+> **embeddings → rapidfuzz fuzzy matching**. Install `requirements-full.txt` to get
+> the full models.
 
 **4. Add your OpenAI key**
 

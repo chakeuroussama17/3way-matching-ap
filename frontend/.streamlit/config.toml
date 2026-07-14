@@ -1,10 +1,10 @@
-# MindHive theme — restrained slate-navy with a single muted-gold accent.
+# MindHive theme — "Nova" style: dark with a violet accent.
 [theme]
 base                    = "dark"
-primaryColor            = "#D8A83E"   # muted gold — primary action / progress only
-backgroundColor         = "#0E1B2C"   # slate-navy app background
-secondaryBackgroundColor= "#152436"   # cards, sidebar, inputs
-textColor               = "#DCE5F0"   # soft ink
+primaryColor            = "#7C5CFF"   # violet — primary action / progress / active
+backgroundColor         = "#0A0A14"   # near-black app background
+secondaryBackgroundColor= "#14141F"   # cards, sidebar, inputs
+textColor               = "#ECECF6"   # soft ink
 font                    = "sans serif"
 
 [server]
